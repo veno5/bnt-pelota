@@ -1,0 +1,19 @@
+name: Publicar BNT Pelota en Cloudflare
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v6
+      - name: Publicar en el proyecto original bnt-pelota
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 193486693c9ba649c47c57b9e550408f
+          command: pages deploy public --project-name=bnt-pelota --branch=main
