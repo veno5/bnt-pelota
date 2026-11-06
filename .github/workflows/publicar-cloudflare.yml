@@ -11,9 +11,21 @@ jobs:
     steps:
       - name: Descargar el código
         uses: actions/checkout@v6
+      - name: Normalizar token de Cloudflare
+        shell: bash
+        env:
+          TOKEN_CONFIGURADO: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          TOKEN_LIMPIO="$(printf '%s' "$TOKEN_CONFIGURADO" | tr -d '[:space:]')"
+          if [ -z "$TOKEN_LIMPIO" ]; then
+            echo "Falta configurar CLOUDFLARE_API_TOKEN en GitHub Secrets"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN_LIMPIO"
+          printf 'CF_TOKEN_LIMPIO=%s\n' "$TOKEN_LIMPIO" >> "$GITHUB_ENV"
       - name: Publicar en el proyecto original bnt-pelota
         uses: cloudflare/wrangler-action@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          apiToken: ${{ env.CF_TOKEN_LIMPIO }}
           accountId: 193486693c9ba649c47c57b9e550408f
           command: pages deploy public --project-name=bnt-pelota --branch=main
