@@ -1,0 +1,19 @@
+{
+  "name": "BNT Pelota Dominicana",
+  "short_name": "BNT Pelota",
+  "description": "Juegos, posiciones y calendario de LIDOM. Canales oficiales de transmisión.",
+  "lang": "es-DO",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#071729",
+  "theme_color": "#0b223f",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
