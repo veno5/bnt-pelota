@@ -20,13 +20,17 @@ jobs:
           import os
           import re
           import sys
-          token = os.environ.get('TOKEN_CONFIGURADO', '').strip()
-          token = re.sub(r'^(?:Authorization\s*:\s*)?Bearer\s+', '', token, flags=re.I)
-          token = re.sub(r'^CLOUDFLARE_API_TOKEN\s*=\s*', '', token, flags=re.I)
-          token = token.strip().strip('"`\'').strip()
-          token = re.sub(r'\s+', '', token)
-          if not token or not re.fullmatch(r'[A-Za-z0-9._~+=/\-]+', token):
-              print('El Secret CLOUDFLARE_API_TOKEN no tiene formato de token valido.', file=sys.stderr)
+          raw = os.environ.get('TOKEN_CONFIGURADO','').strip()
+          # Token directo, Bearer completo, o el comando de verificacion que Cloudflare ofrece copiar.
+          matches = re.findall(r'Bearer\s+([A-Za-z0-9._~+=/\-]{30,})', raw, flags=re.I)
+          if len(set(matches)) == 1:
+              token = matches[0]
+          else:
+              token = re.sub(r'^CLOUDFLARE_API_TOKEN\s*=\s*', '', raw, flags=re.I)
+              token = token.strip().strip('\"`\'').strip()
+              token = re.sub(r'\s+', '', token)
+          if not re.fullmatch(r'[A-Za-z0-9._~+=/\-]{30,}', token):
+              print('El contenido guardado en GitHub no parece ser un token API de Cloudflare. Copia solo el codigo de token.',file=sys.stderr)
               sys.exit(1)
           sys.stdout.write(token)
           PY
