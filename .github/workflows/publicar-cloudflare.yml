@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -37,9 +37,19 @@ jobs:
           )"
           echo "::add-mask::$TOKEN_LIMPIO"
           printf 'CF_TOKEN_LIMPIO=%s\n' "$TOKEN_LIMPIO" >> "$GITHUB_ENV"
+      - name: Recuperar el icono aprobado de BNT Pelota
+        run: python3 scripts/recuperar_icono.py
       - name: Publicar en el proyecto original bnt-pelota
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ env.CF_TOKEN_LIMPIO }}
           accountId: 193486693c9ba649c47c57b9e550408f
           command: pages deploy public --project-name=bnt-pelota --branch=main
+      - name: Guardar iconos originales para próximas actualizaciones
+        shell: bash
+        run: |
+          git add public/icon-192.png public/icon-512.png public/apple-touch-icon.png public/favicon-64.png
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Guardar iconos originales BNT Pelota"
+            git push
+          fi
