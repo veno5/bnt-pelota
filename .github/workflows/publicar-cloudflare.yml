@@ -16,11 +16,21 @@ jobs:
         env:
           TOKEN_CONFIGURADO: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          TOKEN_LIMPIO="$(printf '%s' "$TOKEN_CONFIGURADO" | tr -d '[:space:]')"
-          if [ -z "$TOKEN_LIMPIO" ]; then
-            echo "Falta configurar CLOUDFLARE_API_TOKEN en GitHub Secrets"
-            exit 1
-          fi
+          TOKEN_LIMPIO="$(python3 - <<'PY'
+          import os
+          import re
+          import sys
+          token = os.environ.get('TOKEN_CONFIGURADO', '').strip()
+          token = re.sub(r'^(?:Authorization\s*:\s*)?Bearer\s+', '', token, flags=re.I)
+          token = re.sub(r'^CLOUDFLARE_API_TOKEN\s*=\s*', '', token, flags=re.I)
+          token = token.strip().strip('"`\'').strip()
+          token = re.sub(r'\s+', '', token)
+          if not token or not re.fullmatch(r'[A-Za-z0-9._~+=/\-]+', token):
+              print('El Secret CLOUDFLARE_API_TOKEN no tiene formato de token valido.', file=sys.stderr)
+              sys.exit(1)
+          sys.stdout.write(token)
+          PY
+          )"
           echo "::add-mask::$TOKEN_LIMPIO"
           printf 'CF_TOKEN_LIMPIO=%s\n' "$TOKEN_LIMPIO" >> "$GITHUB_ENV"
       - name: Publicar en el proyecto original bnt-pelota
