@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title"><title id="title">BNT Pelota Dominicana</title>
+<defs><radialGradient id="night" cx="50%" cy="28%" r="90%"><stop stop-color="#2366a2"/><stop offset="1" stop-color="#061a36"/></radialGradient><linearGradient id="gold" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff0a4"/><stop offset="1" stop-color="#f5aa2c"/></linearGradient></defs>
+<rect x="8" y="8" width="496" height="496" rx="112" fill="url(#night)" stroke="#d2a453" stroke-width="14"/>
+<circle cx="256" cy="253" r="142" fill="#f9fbff" stroke="#b8d2e5" stroke-width="12"/>
+<path d="M171 143c74 53 74 170 0 222M341 143c-74 53-74 170 0 222" fill="none" stroke="#bc2239" stroke-width="17" stroke-linecap="round"/>
+<path d="M177 166l-27 11m31 17l-29 7m29 23l-30 4m29 23l-29-2m29 22l-28-7m27 23l-26-12m24 33l-22-15M335 166l27 11m-31 17l29 7m-29 23l30 4m-29 23l29-2m-29 22l28-7m-27 23l26-12m-24 33l22-15" stroke="#bc2239" stroke-width="8" stroke-linecap="round"/>
+<path d="M51 66h410v91H51z" fill="#0c2a50" opacity=".96"/><text x="256" y="131" font-size="80" font-family="Arial, sans-serif" font-weight="900" fill="url(#gold)" text-anchor="middle">BNT</text>
+<rect x="70" y="379" width="372" height="82" rx="35" fill="#0a294a" stroke="#f2c663" stroke-width="7"/><text x="256" y="435" font-size="57" font-family="Arial, sans-serif" font-weight="900" fill="white" text-anchor="middle">PELOTA</text></svg>
