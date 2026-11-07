@@ -45,6 +45,19 @@ jobs:
           apiToken: ${{ env.CF_TOKEN_LIMPIO }}
           accountId: 193486693c9ba649c47c57b9e550408f
           command: pages deploy public --project-name=bnt-pelota --branch=main
+      - name: Verificar registro y D1 (sin datos de clientes)
+        shell: bash
+        continue-on-error: true
+        run: |
+          for intento in 1 2 3 4 5; do
+            RESPUESTA="$(curl -fsS --max-time 12 https://bnt-pelota.pages.dev/api/health 2>&1)" && {
+              echo "DIAGNOSTICO: $RESPUESTA"
+              exit 0
+            }
+            echo "Intento $intento: $RESPUESTA"
+            sleep 4
+          done
+          echo "No se pudo verificar la API del registro"
       - name: Guardar iconos originales para próximas actualizaciones
         shell: bash
         run: |
