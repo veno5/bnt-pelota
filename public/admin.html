@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>BNT Pelota · Administración</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#071b30;color:#eff8ff}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:linear-gradient(155deg,#113e69,#061b31 55%)}
+.wrap{max-width:1040px;margin:0 auto;padding:22px 15px 65px}a{color:#bee5ff}.heading{display:flex;gap:12px;align-items:center;margin:17px 0 24px}.heading img{width:50px;height:50px;border-radius:12px}h1{font-size:24px;margin:0}.muted{color:#bad1e2;font-size:12px;line-height:1.5}
+.card{background:#0f2d49;border:1px solid #356183;border-radius:16px;padding:18px;margin-bottom:15px}
+label{display:block;font-size:13px;margin:12px 0 6px}input,select{padding:10px;border-radius:8px;border:1px solid #6689a7;background:#0a2440;color:#fff;max-width:100%;font-size:15px}input[type=password]{width:100%}
+button{border:0;background:#efc15d;color:#1c2935;border-radius:9px;padding:10px 12px;font-weight:800;cursor:pointer}button:disabled{opacity:.45;cursor:default}
+button.alt{background:#285879;color:#fff}button.warn{background:#b64743;color:#fff}
+#message{padding:12px;border-radius:8px;background:#204563;margin:12px 0}#message[hidden],#login-section[hidden],#panel[hidden]{display:none}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.tile{text-align:center;background:#143a5d;border-radius:10px;padding:11px 4px}.tile strong{display:block;font-size:26px;color:#ffe3a1}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;min-width:730px}th,td{text-align:left;border-bottom:1px solid #35536d;padding:11px 7px;vertical-align:middle}th{color:#c9dfeb;font-size:12px}
+.actions{display:flex;gap:5px;flex-wrap:wrap}.actions button{font-size:11px;padding:8px}.status{font-weight:800}.active{color:#87edba}.pending{color:#ffe098}.expired,.suspended{color:#ffb2a5}
+.formline{display:grid;grid-template-columns:1fr 1fr;gap:9px;max-width:350px}.formline input{width:100%}.confirm{border-top:1px solid #42627c;margin-top:16px;padding-top:16px}.confirm p{margin:5px 0 10px}
+@media(max-width:540px){.tiles{grid-template-columns:repeat(2,1fr)}.wrap{padding:16px 11px 40px}h1{font-size:20px}}
+</style></head><body>
+<main class="wrap"><a href="./">← Volver a BNT Pelota</a>
+<div class="heading"><img src="./icon-192.png" alt="BNT Pelota"><div><h1>Panel de administrador</h1><div class="muted">BNT Pelota · Clientes y suscripciones</div></div></div>
+<div id="message" role="status" hidden></div>
+<section class="card" id="login-section" hidden><h2>Acceso privado</h2><form id="login"><label for="password">Contraseña de administrador</label><input id="password" type="password" autocomplete="current-password" required><p class="muted">Solo el propietario puede registrar pagos y cambiar el acceso de clientes.</p><button type="submit">Entrar al panel</button></form></section>
+<section id="panel" hidden>
+<div class="tiles"><div class="tile"><strong id="total">0</strong><span>Registrados</span></div><div class="tile"><strong id="active">0</strong><span>Pagados</span></div><div class="tile"><strong id="pending">0</strong><span>Pendientes</span></div><div class="tile"><strong id="expired">0</strong><span>Vencidos</span></div></div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2>Clientes</h2><div><button id="refresh" type="button" class="alt">Actualizar</button> <button id="logout" type="button" class="alt">Salir</button></div></div>
+<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Estado</th><th>Vencimiento</th><th>Acciones</th></tr></thead><tbody id="members"></tbody></table></div>
+<p class="muted">Los pagos se registran únicamente después de comprobar la transferencia. Los datos se guardan en Cloudflare D1.</p></div>
+<div id="payment-form" class="card" hidden><h2>Registrar transferencia confirmada</h2><div id="selected-member"></div><div class="formline"><div><label for="months">Meses pagados</label><select id="months"><option value="1">1 mes</option><option value="2">2 meses</option><option value="3">3 meses</option><option value="6">6 meses</option><option value="12">12 meses</option></select></div><div><label for="amount">Importe recibido (USD)</label><input id="amount" type="number" value="2.00" min=".01" max="1000" step=".01"></div></div>
+<label for="reference">Referencia de transferencia (opcional)</label><input id="reference" style="width:100%" maxlength="100">
+<p class="muted">No marca automáticamente pagos. Tú debes comprobar el depósito antes de confirmar.</p>
+<button id="save-payment">Confirmar pago y activar</button> <button id="cancel-payment" class="alt">Cancelar</button></div>
+<div class="card"><h2>Pagos registrados</h2><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Importe</th><th>Meses</th><th>Vence</th><th>Referencia</th></tr></thead><tbody id="payments"></tbody></table></div></div>
+</section>
+</main>
+<script>
+"use strict";
+const $=id=>document.getElementById(id),statusNames={active:"Pagado",pending:"Pendiente",expired:"Vencido",suspended:"Suspendido"};
+let selected=null,records=[];
+function say(s){$("message").hidden=false;$("message").textContent=s;}
+async function api(path,opts){
+ const res=await fetch("/api/"+path,{credentials:"same-origin",cache:"no-store",...opts});
+ const d=await res.json().catch(()=>({error:"No se pudo conectar"}));
+ if(!res.ok)throw Error(d.error||"Solicitud fallida");
+ return d;
+}
+const post=(path,obj)=>api(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(obj)});
+function cell(row,text){const td=document.createElement("td");td.textContent=text??"";row.append(td);return td}
+async function load(){
+ const [data,pay]=await Promise.all([api("admin/members"),api("admin/payments")]);
+ records=data.members;
+ for(const k of ["total","active","pending","expired"])$(k).textContent=data.summary[k]??"0";
+ const body=$("members");body.replaceChildren();
+ for(const m of records){
+  const tr=document.createElement("tr");
+  cell(tr,m.name);cell(tr,m.phone);
+  const state=cell(tr,statusNames[m.status]||m.status);state.className="status "+m.status;
+  cell(tr,m.paid_until||"Sin pagar");
+  const td=cell(tr,"");const actions=document.createElement("div");actions.className="actions";
+  const payBtn=document.createElement("button");payBtn.type="button";payBtn.textContent="Registrar pago";
+  payBtn.addEventListener("click",()=>{selected=m;$("selected-member").textContent=m.name+" · "+m.phone;$("payment-form").hidden=false;$("payment-form").scrollIntoView({behavior:"smooth"});});
+  actions.append(payBtn);
+  const toggle=document.createElement("button");toggle.type="button";toggle.className=m.status==="suspended"?"alt":"warn";toggle.textContent=m.status==="suspended"?"Habilitar":"Suspender";
+  toggle.addEventListener("click",async()=>{
+   if(!confirm((m.status==="suspended"?"¿Habilitar a ":"¿Suspender a ")+m.name+"?"))return;
+   toggle.disabled=true;
+   try{await post("admin/status",{member_id:m.id,status:m.status==="suspended"?"active":"suspended"});say("Cambio guardado");await load()}
+   catch(e){say(e.message)}finally{toggle.disabled=false}
+  });actions.append(toggle);td.append(actions);body.append(tr);
+ }
+ const pbody=$("payments");pbody.replaceChildren();
+ for(const p of pay.payments){
+  const tr=document.createElement("tr");
+  cell(tr,p.name||"Cliente");cell(tr,(p.amount_cents/100).toFixed(2)+" "+p.currency);cell(tr,String(p.months));cell(tr,p.new_until);cell(tr,p.reference||"—");pbody.append(tr);
+ }
+}
+$("login").addEventListener("submit",async e=>{
+ e.preventDefault();const btn=e.currentTarget.querySelector("button");btn.disabled=true;
+ try{await post("admin/login",{password:$("password").value});$("password").value="";$("login-section").hidden=true;$("panel").hidden=false;say("Acceso autorizado");await load()}
+ catch(err){say(err.message)}finally{btn.disabled=false}
+});
+$("save-payment").addEventListener("click",async()=>{
+ if(!selected)return;
+ const months=Number($("months").value),amount=Number($("amount").value),reference=$("reference").value.trim();
+ if(!amount||amount<=0)return say("Introduce el importe recibido");
+ if(!confirm("¿Confirmas que recibiste la transferencia de "+selected.name+" por US$"+amount.toFixed(2)+"?"))return;
+ const btn=$("save-payment");btn.disabled=true;
+ try{await post("admin/pay",{member_id:selected.id,months,amount_usd:amount,reference});say("Pago guardado. Cuenta actualizada.");$("payment-form").hidden=true;selected=null;$("reference").value="";await load()}
+ catch(e){say(e.message)}finally{btn.disabled=false}
+});
+$("cancel-payment").addEventListener("click",()=>{$("payment-form").hidden=true;selected=null});
+$("refresh").addEventListener("click",()=>load().catch(e=>say(e.message)));
+$("logout").addEventListener("click",async()=>{try{await api("logout",{method:"POST"})}catch(_){} location.reload()});
+(async()=>{try{
+ const config=await api("status");
+ if(!config.configured){say("Panel en preparación. Falta conectar Cloudflare D1 y la contraseña del propietario.");return;}
+ try{const m=await api("me");if(m.role==="admin"){$("panel").hidden=false;await load();return}}catch(_){}
+ $("login-section").hidden=false;
+}catch(_){say("El panel todavía no está disponible")}})();
+</script></body></html>

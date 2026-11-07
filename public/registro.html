@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>BNT Pelota · Registro</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#f2f8ff;background:#071b30}*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(155deg,#0e3761,#061b31 60%);min-height:100vh}
+.wrap{max-width:500px;padding:24px 16px 70px;margin:0 auto}
+a{color:#addaff}.head{display:flex;align-items:center;gap:12px;margin:20px 0 24px}.head img{width:56px;height:56px;border-radius:14px}
+h1{font-size:24px;margin:0}.subtitle{color:#b9d6e9;font-size:13px;margin:4px 0 0}
+.card{border:1px solid #3f6f98;background:#0f2c49;border-radius:18px;padding:20px;margin:14px 0}
+.price{text-align:center;color:#ffd685;font-weight:900;font-size:24px;margin:12px 0}.price span{font-size:13px;color:#c9dfec}
+label{display:block;font-size:13px;font-weight:750;margin:13px 0 5px}input{width:100%;padding:13px;border:1px solid #7796b4;background:#08233d;color:#fff;border-radius:10px;font-size:16px}input:focus{outline:2px solid #f5ce69}
+button{width:100%;background:#efbd48;color:#1e2c38;font-weight:900;border:0;border-radius:11px;padding:14px;font-size:15px;cursor:pointer;margin-top:16px}button:disabled{opacity:.5;cursor:default}
+.ghost{background:#1c496b;color:#e3f5ff;margin-top:9px}.muted{font-size:12px;line-height:1.5;color:#b6d0df}
+#message{margin:14px 0;border-radius:10px;padding:12px;background:#173d5a;line-height:1.5}#message[hidden],.card[hidden]{display:none}
+.ok{border-left:4px solid #60e6a2}.bad{border-left:4px solid #ff9c9c}.hint{color:#eedda5}
+</style>
+</head>
+<body><main class="wrap">
+<a href="./">← Volver a BNT Pelota</a>
+<div class="head"><img src="./icon-192.png" alt="BNT Pelota"><div><h1>BNT Pelota Dominicana</h1><p class="subtitle">Registro y mensualidades</p></div></div>
+<section class="card"><div class="price">US$2 <span>/ mes · pago por transferencia</span></div><p class="muted">El registro no cobra dinero. El administrador confirmará el pago y activará la mensualidad. Los partidos siguen en acceso abierto mientras se completan las autorizaciones comerciales.</p></section>
+<div id="message" role="status" hidden></div>
+<section class="card" id="ready" hidden><h2>Crear mi cuenta</h2>
+<form id="signup">
+<label for="name">Tu nombre completo</label><input id="name" name="name" maxlength="80" minlength="3" autocomplete="name" required>
+<label for="phone">Número de teléfono de RD</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="809 000 0000" required>
+<label for="pin">PIN privado (6 a 8 números)</label><input id="pin" name="pin" inputmode="numeric" type="password" pattern="[0-9]{6,8}" minlength="6" maxlength="8" autocomplete="new-password" required>
+<button type="submit">Registrarme</button>
+</form><p class="muted">Después del registro, comunícate con el administrador para conocer cómo transferir y confirmar tu pago.</p>
+</section>
+<section class="card" id="access" hidden><h2>Ya tengo una cuenta</h2>
+<form id="login">
+<label for="login-phone">Teléfono</label><input id="login-phone" type="tel" autocomplete="tel" required>
+<label for="login-pin">PIN privado</label><input id="login-pin" type="password" inputmode="numeric" autocomplete="current-password" required>
+<button type="submit" class="ghost">Consultar mi mensualidad</button>
+</form>
+</section>
+<section class="card" id="account" hidden><h2>Mi cuenta</h2><p id="account-details"></p><button id="logout" type="button" class="ghost">Cerrar sesión</button></section>
+<p class="muted"><a href="./admin.html">Acceso del administrador</a></p>
+</main>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const message=(txt,good=false)=>{const el=$("message");el.hidden=false;el.className=good?"ok":"bad";el.textContent=txt};
+async function api(path,options){
+ const r=await fetch("/api/"+path,{credentials:"same-origin",cache:"no-store",...options});
+ const data=await r.json().catch(()=>({error:"No se pudo conectar con el servidor"}));
+ if(!r.ok)throw Error(data.error||"Solicitud fallida");
+ return data;
+}
+async function current(){
+ try{
+  const data=await api("me");
+  if(data.role!=="member")return;
+  $("ready").hidden=true;$("access").hidden=true;$("account").hidden=false;
+  const m=data.member;
+  $("account-details").textContent=m.name+" · "+m.phone+" · "+(m.active?"Mensualidad activa hasta "+m.paid_until:m.status==="suspended"?"Cuenta suspendida":m.status==="expired"?"Mensualidad vencida":"Pendiente de confirmación del pago");
+ }catch(_){}
+}
+(async()=>{try{
+ const x=await api("status");
+ if(!x.configured){message("El registro está en preparación. Todavía no se pueden activar cuentas.");return}
+ $("ready").hidden=false;$("access").hidden=false;await current();
+ }catch(_){message("El registro todavía no está disponible");}
+})();
+$("signup").addEventListener("submit",async e=>{
+ e.preventDefault();const btn=e.currentTarget.querySelector("button");btn.disabled=true;
+ try{
+  await api("register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:$("name").value,phone:$("phone").value,pin:$("pin").value})});
+  $("signup").reset();message("Registro recibido. Ahora puedes consultar tu cuenta; la mensualidad se activa cuando el administrador confirme la transferencia.",true);
+ }catch(err){message(err.message)}finally{btn.disabled=false}
+});
+$("login").addEventListener("submit",async e=>{
+ e.preventDefault();const btn=e.currentTarget.querySelector("button");btn.disabled=true;
+ try{await api("login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phone:$("login-phone").value,pin:$("login-pin").value})});message("Sesión iniciada.",true);await current()}
+ catch(err){message(err.message)}finally{btn.disabled=false}
+});
+$("logout").addEventListener("click",async()=>{try{await api("logout",{method:"POST"})}catch(_){}
+ location.reload()});
+</script></body></html>
