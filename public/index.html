@@ -139,6 +139,17 @@
  #juegos .game-card .game-place{font-size:10px}
 }
 
+/* El detalle abierto sustituye a la tarjeta-resumen: un único marcador en pantalla. */
+#juegos .game-card.selected > .game-btn{display:none}
+#juegos .game-card.selected > #game-detail > .view-detail{
+  margin:0;padding:15px 16px;border:0;border-radius:12px;background:transparent;box-shadow:none
+}
+#juegos .game-card.selected > #game-detail .detail-context{
+  margin:10px 0 4px;color:#bdd5e7;font-size:11px;line-height:1.5
+}
+@media(max-width:480px){
+ #juegos .game-card.selected > #game-detail > .view-detail{margin:0;padding:13px 11px}
+}
 /* Señal de turno clara tanto en tarjeta del juego como en el marcador desplegado. */
 #juegos .game-card .game-team.batting,
 #juegos #game-detail .scoreboard .scoreboard-team.batting-team{
@@ -417,6 +428,7 @@ function detailRender(g,feed){
  root.hidden=false;
  const header=`<div class="detailtop"><b>${escapeHTML(shownStatus(g))}</b><button type="button" class="outline-button" id="close-detail">Cerrar ×</button></div>`;
  const media=broadcastButtons(g.teams.home.team.name,g.teams.away.team.name);
+ const contextLine=`<p class="detail-context">📅 ${escapeHTML(displayDate(g.gameDate))} · ${escapeHTML(displayTime(g.gameDate))} (RD) · 📍 ${escapeHTML(g.venue?.name||'Estadio por confirmar')}</p>`;
  if(!started){
   root.innerHTML=`<section class="view-detail">${header}<div class="game-detail-message"><strong>⚾ ${escapeHTML(shownStatus(g))}</strong>El partido todavía no ha comenzado. El marcador permanece en blanco.<br><span class="muted">${escapeHTML(displayDate(g.gameDate))} · ${escapeHTML(displayTime(g.gameDate))} (RD) · ${escapeHTML(g.venue?.name||"Estadio por confirmar")}</span></div>${media}</section>`;
  }else{
@@ -426,7 +438,7 @@ function detailRender(g,feed){
   const bases=live&&l?.offense?diamond(l):`<div class="game-detail-message">${live?'La fuente todavía no ha informado qué bases están ocupadas.':'El partido terminó. Las bases en tiempo real ya no están disponibles.'}</div>`;
   const latestPlay=current?.result?.description||last?.result?.description||'La fuente todavía no ha publicado jugadas detalladas de este partido.';
   const count=(n)=>live?numberOrDash(n):'—';
-  root.innerHTML=`<section class="view-detail">${header}<div class="scoreboard"><div class="scoreboard-team ${batting==='away'?'batting-team':''}"><strong>${escapeHTML(away)}</strong>${batting==='away'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sa)}</div></div><div><span class="muted">${escapeHTML(String(inning))}</span><br><span class="muted">${escapeHTML(half)}</span></div><div class="scoreboard-team ${batting==='home'?'batting-team':''}"><strong>${escapeHTML(home)}</strong>${batting==='home'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sh)}</div></div></div>${pitcherPanel(g,feed,l)}${bases}<div class="counts"><div class="stat"><strong>${count(l?.balls)}</strong><span>Bolas</span></div><div class="stat"><strong>${count(l?.strikes)}</strong><span>Strikes</span></div><div class="stat"><strong>${count(l?.outs)}</strong><span>Outs</span></div></div><div class="play"><b>${live?'Última jugada':'Última jugada registrada'}</b><p>${escapeHTML(latestPlay)}</p></div><p class="data-source">${feed?'Detalle consultado de MLB Stats API.':'Detalle no disponible: se conserva únicamente la información confirmada por el calendario.'} No se inventan carreras, corredores ni conteos.</p>${media}</section>`;
+  root.innerHTML=`<section class="view-detail">${header}${contextLine}<div class="scoreboard"><div class="scoreboard-team ${batting==='away'?'batting-team':''}"><strong>${escapeHTML(away)}</strong>${batting==='away'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sa)}</div></div><div><span class="muted">${escapeHTML(String(inning))}</span><br><span class="muted">${escapeHTML(half)}</span></div><div class="scoreboard-team ${batting==='home'?'batting-team':''}"><strong>${escapeHTML(home)}</strong>${batting==='home'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sh)}</div></div></div>${pitcherPanel(g,feed,l)}${bases}<div class="counts"><div class="stat"><strong>${count(l?.balls)}</strong><span>Bolas</span></div><div class="stat"><strong>${count(l?.strikes)}</strong><span>Strikes</span></div><div class="stat"><strong>${count(l?.outs)}</strong><span>Outs</span></div></div><div class="play"><b>${live?'Última jugada':'Última jugada registrada'}</b><p>${escapeHTML(latestPlay)}</p></div><p class="data-source">${feed?'Detalle consultado de MLB Stats API.':'Detalle no disponible: se conserva únicamente la información confirmada por el calendario.'} No se inventan carreras, corredores ni conteos.</p>${media}</section>`;
  }
  $('#close-detail').onclick=()=>{root.hidden=true;selected=null;renderGames();};
 }
