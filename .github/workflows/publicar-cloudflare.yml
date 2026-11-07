@@ -59,6 +59,23 @@ jobs:
             sleep 4
           done
           echo "No se pudo verificar la API del registro"
+      - name: Comprobar iconos Android iPhone y acceso gratuito
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -e
+          echo "Manifest:"
+          curl -fsS --max-time 15 https://bnt-pelota.pages.dev/manifest.webmanifest | grep -q 'icon-512.png'
+          echo "PNG de Android (192 y 512):"
+          curl -fsSI --max-time 15 https://bnt-pelota.pages.dev/icon-192.png | grep -qi "content-type: image/png"
+          curl -fsSI --max-time 15 https://bnt-pelota.pages.dev/icon-512.png | grep -qi "content-type: image/png"
+          echo "PNG de iPhone (180):"
+          curl -fsSI --max-time 15 https://bnt-pelota.pages.dev/apple-touch-icon.png | grep -qi "content-type: image/png"
+          echo "Acceso anónimo sin permisos para Juegos:"
+          curl -fsS --max-time 15 https://bnt-pelota.pages.dev/api/access | grep -q '"allowed":false'
+          echo "Planes:"
+          curl -fsS --max-time 15 https://bnt-pelota.pages.dev/api/status | grep -q '"monthly_usd":3'
+          echo "ICONOS, ACCESO Y PLANES VERIFICADOS"
       - name: Guardar iconos originales para próximas actualizaciones
         shell: bash
         run: |
