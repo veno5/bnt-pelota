@@ -33,6 +33,15 @@ async function initialize(db){
    await db.prepare("CREATE INDEX IF NOT EXISTS bnt_payments_member_idx ON bnt_payments(member_id,created_at)").run();
    await db.prepare("CREATE TABLE IF NOT EXISTS bnt_sessions (token_hash TEXT PRIMARY KEY, actor TEXT NOT NULL, member_id TEXT, expires_at INTEGER NOT NULL)").run();
    await db.prepare("CREATE TABLE IF NOT EXISTS bnt_limits (key TEXT PRIMARY KEY, period_start INTEGER NOT NULL, count INTEGER NOT NULL)").run();
+   await db.prepare("CREATE TABLE IF NOT EXISTS bnt_entitlements (member_id TEXT PRIMARY KEY, trial_until TEXT NOT NULL, plan TEXT NOT NULL DEFAULT 'trial', updated_at TEXT NOT NULL)").run();
+   await db.prepare("CREATE TABLE IF NOT EXISTS bnt_payment_types (payment_id TEXT PRIMARY KEY, plan TEXT NOT NULL)").run();
+   await db.prepare("CREATE TABLE IF NOT EXISTS bnt_visits (visitor_hash TEXT NOT NULL, day TEXT NOT NULL, member_id TEXT, hits INTEGER NOT NULL DEFAULT 1, last_seen TEXT NOT NULL, PRIMARY KEY(visitor_hash,day))").run();
+   await db.prepare("CREATE INDEX IF NOT EXISTS bnt_visits_member_idx ON bnt_visits(member_id,day)").run();
+   // Para las cuentas existentes, el período de prueba parte de la fecha original del registro.
+   const previous=await db.prepare("SELECT id,created_at FROM bnt_members WHERE id NOT IN (SELECT member_id FROM bnt_entitlements)").all();
+   for(const m of previous.results||[]){
+    await db.prepare("INSERT OR IGNORE INTO bnt_entitlements(member_id,trial_until,updated_at) VALUES(?,?,?)").bind(m.id,new Date(Date.parse(m.created_at)+259200000).toISOString(),new Date().toISOString()).run();
+   }
   })().catch(e=>{initPromise=null;throw e;});
  }
  return initPromise;
@@ -83,12 +92,25 @@ async function limit(db,key,max,seconds){
  return true;
 }
 async function memberRecord(db,id){
- return db.prepare("SELECT id,name,phone,status,paid_until,created_at FROM bnt_members WHERE id=?").bind(id).first();
+ return db.prepare("SELECT m.id,m.name,m.phone,m.status,m.paid_until,m.created_at,e.trial_until,e.plan FROM bnt_members m LEFT JOIN bnt_entitlements e ON e.member_id=m.id WHERE m.id=?").bind(id).first();
 }
 function memberView(m){
  if(!m)return null;
- const active=m.status==="active"&&!!m.paid_until&&m.paid_until>=today();
- return {id:m.id,name:m.name,phone:m.phone,status:active?"active":m.status==="suspended"?"suspended":m.paid_until&&m.paid_until<today()?"expired":"pending",paid_until:m.paid_until,active,created_at:m.created_at};
+ const paid=m.status==="active"&&!!m.paid_until&&m.paid_until>=today();
+ const trial=!paid&&m.status!=="suspended"&&m.trial_until&&Date.parse(m.trial_until)>Date.now();
+ const status=m.status==="suspended"?"suspended":paid?"active":trial?"trial":m.paid_until||m.trial_until?"expired":"pending";
+ return {id:m.id,name:m.name,phone:m.phone,status,paid_until:m.paid_until,trial_until:m.trial_until,
+  plan:paid?(m.plan==="season"?"season":"monthly"):trial?"trial":m.plan,access_until:paid?m.paid_until:trial?m.trial_until:null,
+  active:!!(paid||trial),created_at:m.created_at};
+}
+const SEASON_END="2027-03-31"; // Vencimiento técnico de la temporada 2026-27, ajustable a la final real.
+async function sportsJSON(path){
+ const ctrl=new AbortController();const timeout=setTimeout(()=>ctrl.abort(),11000);
+ try{
+  const response=await fetch("https://statsapi.mlb.com"+path,{signal:ctrl.signal});
+  if(!response.ok)throw Error("Datos deportivos no disponibles");
+  return json(await response.json());
+ }finally{clearTimeout(timeout)}
 }
 export async function onRequest(context){
  const {request,env}=context;
@@ -116,7 +138,7 @@ export async function onRequest(context){
    return json({ok:false,stage,code:"SERVICE_CHECK_FAILED"},503);
   }
  }
- if(route==="status"&&request.method==="GET")return json({ok:true,configured:!!env.DB&&typeof env.BNT_ADMIN_PASSWORD==="string"&&env.BNT_ADMIN_PASSWORD.length>=12,price_usd:2,mode:"transferencia_manual"});
+ if(route==="status"&&request.method==="GET")return json({ok:true,configured:!!env.DB&&typeof env.BNT_ADMIN_PASSWORD==="string"&&env.BNT_ADMIN_PASSWORD.length>=12,plans:{trial_days:3,monthly_usd:3,season_usd:8},mode:"transferencia_manual"});
  if(!env.DB||typeof env.BNT_ADMIN_PASSWORD!=="string"||env.BNT_ADMIN_PASSWORD.length<12)return reject("Suscripciones aun en configuracion",503);
  try{
   await initialize(env.DB);
@@ -134,7 +156,9 @@ export async function onRequest(context){
     if(/UNIQUE/i.test(String(e)))return reject("Este telefono ya esta registrado",409);
     throw e;
    }
-   return json({ok:true,message:"Registro recibido. La mensualidad se activa despues de confirmar la transferencia."},201);
+   const registered=await db.prepare("SELECT id,created_at FROM bnt_members WHERE phone=?").bind(phone).first();
+   await db.prepare("INSERT OR IGNORE INTO bnt_entitlements(member_id,trial_until,updated_at) VALUES(?,?,?)").bind(registered.id,new Date(Date.parse(registered.created_at)+259200000).toISOString(),new Date().toISOString()).run();
+   return json({ok:true,message:"Registro recibido. Entra con tu telefono y PIN para disfrutar 3 dias gratis."},201);
   }
   if(route==="login"&&request.method==="POST"){
    const data=await readBody(request),phone=cleanPhone(data.phone),pin=String(data.pin||"");
@@ -157,8 +181,37 @@ export async function onRequest(context){
    if(token)await db.prepare("DELETE FROM bnt_sessions WHERE token_hash=?").bind(await sha(token)).run();
    return json({ok:true},200,{"set-cookie":sessionCookie("",0)});
   }
+  // Visitas únicas aproximadas por navegador y día; no se guarda IP en el historial.
+  if(route==="visit"&&request.method==="POST"){
+   const data=await readBody(request),visitor=String(data.visitor||"");
+   if(!new RegExp("^[a-f0-9]{32}$").test(visitor))return reject("Identificador de visita invalido");
+   const current=await session(db,request),memberId=current?.actor==="member"?current.member_id:null,now=new Date().toISOString();
+   await db.prepare("INSERT INTO bnt_visits(visitor_hash,day,member_id,hits,last_seen) VALUES(?,?,?,1,?) ON CONFLICT(visitor_hash,day) DO UPDATE SET member_id=COALESCE(excluded.member_id,bnt_visits.member_id),hits=hits+1,last_seen=excluded.last_seen")
+     .bind(await sha(visitor),today(),memberId,now).run();
+   return json({ok:true});
+  }
   const auth=await session(db,request);
+  if(route==="access"&&request.method==="GET"){
+    if(!auth)return json({ok:true,role:"anonymous",allowed:false});
+    if(auth.actor==="admin")return json({ok:true,role:"admin",allowed:true});
+    const member=memberView(await memberRecord(db,auth.member_id));
+    return json({ok:true,role:"member",allowed:!!member?.active,member});
+  }
   if(!auth)return reject("Debes iniciar sesion",401);
+  if(request.method==="GET"&&(route==="games"||route.startsWith("game/"))){
+   const allowed=auth.actor==="admin"||memberView(await memberRecord(db,auth.member_id))?.active;
+   if(!allowed)return reject("La prueba o mensualidad ha vencido. Calendario y Posiciones continúan gratis.",403);
+   if(route==="games"){
+    const query=new URL(request.url).searchParams,from=query.get("from"),to=query.get("to"),datePattern=new RegExp("^\\d{4}-\\d{2}-\\d{2}$");
+    if(!datePattern.test(from||"")||!datePattern.test(to||""))return reject("Fecha invalida");
+    const difference=(Date.parse(to+"T12:00:00Z")-Date.parse(from+"T12:00:00Z"))/86400000;
+    if(!Number.isInteger(difference)||difference<0||difference>2)return reject("Rango no permitido");
+    return sportsJSON("/api/v1/schedule?sportId=17&leagueId=131&startDate="+from+"&endDate="+to+"&hydrate=linescore,probablePitcher");
+   }
+   const pk=route.slice(5);
+   if(!new RegExp("^\\d{5,12}$").test(pk))return reject("Juego invalido");
+   return sportsJSON("/api/v1.1/game/"+pk+"/feed/live");
+  }
   if(route==="me"&&request.method==="GET"){
    if(auth.actor==="admin")return json({ok:true,role:"admin"});
    const m=await memberRecord(db,auth.member_id);
@@ -167,21 +220,31 @@ export async function onRequest(context){
   }
   if(auth.actor!=="admin")return reject("Acceso exclusivo del administrador",403);
   if(route==="admin/members"&&request.method==="GET"){
-   const data=await db.prepare("SELECT id,name,phone,status,paid_until,created_at FROM bnt_members ORDER BY created_at DESC LIMIT 500").all();
-   const list=(data.results||[]).map(memberView);
-   return json({ok:true,members:list,summary:{total:list.length,active:list.filter(m=>m.active).length,pending:list.filter(m=>m.status==="pending").length,expired:list.filter(m=>m.status==="expired").length,suspended:list.filter(m=>m.status==="suspended").length}});
+   const data=await db.prepare("SELECT m.id,m.name,m.phone,m.status,m.paid_until,m.created_at,e.trial_until,e.plan,(SELECT MAX(v.last_seen) FROM bnt_visits v WHERE v.member_id=m.id) AS last_visit FROM bnt_members m LEFT JOIN bnt_entitlements e ON e.member_id=m.id ORDER BY m.created_at DESC LIMIT 500").all();
+   const list=(data.results||[]).map(m=>({...memberView(m),last_visit:m.last_visit}));
+   return json({ok:true,members:list,summary:{total:list.length,active:list.filter(m=>m.status==="active").length,trial:list.filter(m=>m.status==="trial").length,pending:list.filter(m=>m.status==="pending").length,expired:list.filter(m=>m.status==="expired").length,suspended:list.filter(m=>m.status==="suspended").length}});
+  }
+  if(route==="admin/analytics"&&request.method==="GET"){
+   const day=today();
+   const v=await db.prepare("SELECT COUNT(*) AS visitors,COUNT(DISTINCT member_id) AS logged_members,COALESCE(SUM(hits),0) AS total_visits FROM bnt_visits WHERE day=?").bind(day).first();
+   const p=await db.prepare("SELECT COALESCE(SUM(amount_cents),0) AS revenue_cents FROM bnt_payments").first();
+   return json({ok:true,day,unique_visitors:v.visitors||0,logged_members:v.logged_members||0,total_visits:v.total_visits||0,revenue_usd:Number(p.revenue_cents||0)/100});
   }
   if(route==="admin/pay"&&request.method==="POST"){
-   const data=await readBody(request),id=safeText(data.member_id,64),months=Number(data.months||1),amount=Number(data.amount_usd??2),ref=safeText(data.reference||"",100);
-   if(!/^[a-zA-Z0-9-]{36}$/.test(id)||!Number.isInteger(months)||months<1||months>12||!Number.isFinite(amount)||amount<=0||amount>1000||Math.round(amount*100)!==amount*100)return reject("Datos del pago incorrectos");
+   const data=await readBody(request),id=safeText(data.member_id,64),plan=data.plan,reference=safeText(data.reference||"",100);
+   if(!new RegExp("^[a-zA-Z0-9-]{36}$").test(id)||!["monthly","season"].includes(plan))return reject("Cliente o plan invalido");
    const m=await memberRecord(db,id);
    if(!m)return reject("Cliente no encontrado",404);
-   const from=m.paid_until&&m.paid_until>=today()?m.paid_until:today();
-   const end=addMonths(from,months),stamp=new Date().toISOString();
+   const start=plan==="monthly"&&m.status==="active"&&m.paid_until&&m.paid_until>=today()?m.paid_until:today();
+   const until=plan==="monthly"?addMonths(start,1):SEASON_END,price=plan==="monthly"?300:800;
+   if(until<today())return reject("La temporada ha terminado; no aceptes este plan",409);
+   const stamp=new Date().toISOString(),paymentId=crypto.randomUUID();
    await db.batch([
     db.prepare("INSERT INTO bnt_payments(id,member_id,amount_cents,currency,months,previous_until,new_until,reference,created_at) VALUES(?,?,?,'USD',?,?,?,?,?)")
-      .bind(crypto.randomUUID(),id,Math.round(amount*100),months,m.paid_until||null,end,ref||null,stamp),
-    db.prepare("UPDATE bnt_members SET status='active',paid_until=?,updated_at=? WHERE id=?").bind(end,stamp,id)
+      .bind(paymentId,id,price,plan==="monthly"?1:0,m.paid_until||null,until,reference||null,stamp),
+    db.prepare("INSERT INTO bnt_payment_types(payment_id,plan) VALUES(?,?)").bind(paymentId,plan),
+    db.prepare("UPDATE bnt_members SET status='active',paid_until=?,updated_at=? WHERE id=?").bind(until,stamp,id),
+    db.prepare("UPDATE bnt_entitlements SET plan=?,updated_at=? WHERE member_id=?").bind(plan,stamp,id)
    ]);
    return json({ok:true,member:memberView(await memberRecord(db,id))});
   }
@@ -194,7 +257,7 @@ export async function onRequest(context){
    return json({ok:true,member:memberView(await memberRecord(db,id))});
   }
   if(route==="admin/payments"&&request.method==="GET"){
-   const data=await db.prepare("SELECT p.id,p.member_id,m.name,p.amount_cents,p.currency,p.months,p.previous_until,p.new_until,p.reference,p.created_at FROM bnt_payments p LEFT JOIN bnt_members m ON m.id=p.member_id ORDER BY p.created_at DESC LIMIT 200").all();
+   const data=await db.prepare("SELECT p.id,p.member_id,m.name,p.amount_cents,p.currency,p.months,p.previous_until,p.new_until,p.reference,p.created_at,COALESCE(t.plan,\'previous\') AS plan FROM bnt_payments p LEFT JOIN bnt_members m ON m.id=p.member_id LEFT JOIN bnt_payment_types t ON t.payment_id=p.id ORDER BY p.created_at DESC LIMIT 200").all();
    return json({ok:true,payments:data.results||[]});
   }
   return reject("Ruta no encontrada",404);
