@@ -15,7 +15,7 @@ function hex(bytes){return Array.from(bytes).map(x=>x.toString(16).padStart(2,"0
 async function sha(value){return hex(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value))));}
 async function hashedPin(pin,salt){
  const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(pin),"PBKDF2",false,["deriveBits"]);
- return hex(new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",iterations:120000,salt:new TextEncoder().encode(salt)},k,256)));
+ return hex(new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",iterations:100000,salt:new TextEncoder().encode(salt)},k,256)));
 }
 function secureEqual(a,b){if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
 function addMonths(date,months){
