@@ -96,6 +96,26 @@ export async function onRequest(context){
  const route=pathname.replace(/^\/api\/?/,"");
  if(request.method!=="GET"&&request.method!=="POST")return reject("Metodo no permitido",405);
  if(request.method==="POST"&&!sameOrigin(request))return reject("Origen no permitido",403);
+ // Comprobación segura del registro, sin información de clientes ni contraseñas.
+ if(route==="health"&&request.method==="GET"){
+  const configured=!!env.DB&&typeof env.BNT_ADMIN_PASSWORD==="string"&&env.BNT_ADMIN_PASSWORD.length>=12;
+  if(!configured)return json({ok:false,stage:"configuration",code:"MISSING_CONFIGURATION"},503);
+  let stage="database_schema";
+  try{
+   await initialize(env.DB);
+   stage="database_read";
+   await env.DB.prepare("SELECT COUNT(*) AS total FROM bnt_members").first();
+   stage="rate_limit";
+   await limit(env.DB,"selfcheck:"+today(),10000,3600);
+   stage="pin_hash";
+   const digest=await hashedPin("000000","healthcheck");
+   if(digest.length!==64)throw Error("Invalid hash length");
+   return json({ok:true,db:"ready",rate_limit:"ready",pin_hash:"ready"});
+  }catch(error){
+   console.error("BNT health:",stage,error instanceof Error?error.message:"Error");
+   return json({ok:false,stage,code:"SERVICE_CHECK_FAILED"},503);
+  }
+ }
  if(route==="status"&&request.method==="GET")return json({ok:true,configured:!!env.DB&&typeof env.BNT_ADMIN_PASSWORD==="string"&&env.BNT_ADMIN_PASSWORD.length>=12,price_usd:2,mode:"transferencia_manual"});
  if(!env.DB||typeof env.BNT_ADMIN_PASSWORD!=="string"||env.BNT_ADMIN_PASSWORD.length<12)return reject("Suscripciones aun en configuracion",503);
  try{
