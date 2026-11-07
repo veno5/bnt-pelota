@@ -106,6 +106,27 @@
  #juegos .view-detail .scoreboard{grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr)}
 }
 .logo{display:flex;align-items:center;gap:10px}.app-brand-icon{display:block;width:48px;height:48px;flex-shrink:0;object-fit:cover;border:2px solid #ffc65c;border-radius:12px;box-shadow:0 3px 14px #05142690}@media(max-width:450px){.app-brand-icon{width:40px;height:40px}.logo{font-size:18px}}
+/* Señal de turno clara tanto en tarjeta del juego como en el marcador desplegado. */
+#juegos .game-card .game-team.batting,
+#juegos #game-detail .scoreboard .scoreboard-team.batting-team{
+ border-left:5px solid #ffcf46;
+ background:linear-gradient(100deg,rgba(255,203,65,.22),rgba(21,102,75,.26));
+ border-radius:12px;
+ box-shadow:inset 0 0 0 1px rgba(255,214,91,.45),0 0 15px rgba(248,194,38,.18);
+}
+#juegos .game-card .game-team.batting{padding:8px 5px;min-width:0}
+#juegos #game-detail .scoreboard .scoreboard-team.batting-team{padding:10px 5px}
+#juegos .batting-tag{
+ display:inline-flex;align-items:center;justify-content:center;
+ max-width:100%;box-sizing:border-box;
+ background:#135e38;border:1px solid #8de4a5;color:#fff;
+ font-size:11px;line-height:1.2;font-weight:900;letter-spacing:.25px;
+ border-radius:7px;padding:5px 7px;white-space:nowrap;
+ box-shadow:0 0 8px rgba(54,207,104,.24);
+}
+#juegos .scoreboard .scoreboard-team{min-width:0}
+#juegos .scoreboard .scoreboard-team strong{overflow-wrap:anywhere}
+@media(max-width:420px){#juegos .batting-tag{font-size:10px;padding:5px 4px}#juegos .scoreboard .scoreboard-team strong{font-size:13px}}
 </style></head><body><div class="wrap"><div class="top"><div><div class="logo"><img class="app-brand-icon" src="./icon-192.png?v=bnt-icono-original" alt="Ícono BNT Pelota" width="48" height="48">BNT Pelota Dominicana</div><div class="sub">BNT Technology · LIDOM 2026–2027</div></div><span class="tag">DATOS DE LIDOM</span></div><div class="hero"><strong>La pelota dominicana en tu celular</strong><p>Consulta el calendario, las posiciones y los partidos de LIDOM. Consulta automática de MLB Stats API. Los juegos se actualizan cada 30 segundos mientras la aplicación está abierta. La información depende de la disponibilidad de la fuente. En cada partido, consulta las opciones oficiales de transmisión cuando estén disponibles.</p></div><nav class="tabs" aria-label="Secciones"><button class="on" data-tab="juegos">⚾ Juegos</button><button data-tab="posiciones">🏆 Posiciones</button><button data-tab="calendario">📅 Calendario</button></nav><section class="panel on" id="juegos"><h2>Partidos y terreno de juego</h2><div class="update-row"><p id="live-status" class="live-status" role="status">Preparando consulta a MLB Stats API…</p><button class="outline-button" id="force-refresh" type="button">↻ Actualizar</button></div><section class="demo-section" aria-label="Partidos y terreno"><div id="next-games" hidden></div><div id="game-detail" hidden></div><div id="demo-games" hidden></div></section></section><section class="panel" id="posiciones" hidden><h2>Tabla de posiciones</h2><p id="standings-note" class="muted">Consultando posiciones de LIDOM…</p><div class="card"><table><thead><tr><th>Equipo</th><th>J</th><th>G</th><th>P</th><th>PCT</th></tr></thead><tbody id="standings"></tbody></table></div><p class="tiny">J = jugados · G = ganados · P = perdidos. Tabla recibida de MLB Stats API. Si falla la conexión, se conserva la última consulta y se indica su hora.</p></section><section class="panel" id="calendario" hidden><h2>Próximos partidos</h2><p id="calendar-note" class="muted">Consultando próximos juegos…</p><div id="calendar"></div><p class="tiny">Horarios de República Dominicana. El calendario puede cambiar por aplazamientos, suspensiones o decisiones de LIDOM.</p></section><div class="links"><a href="https://www.mlb.com/es/live-stream-games/lidom/2026-schedule" target="_blank" rel="noopener">Calendario MLB ↗</a><a href="https://pelotainvernal.medios.com.do/posiciones/" target="_blank" rel="noopener">Fuente de posiciones ↗</a><a href="https://lidom.com/estadisticas" target="_blank" rel="noopener">LIDOM ↗</a></div><div class="footer">Proyecto independiente · Solo consulta · Sin cuentas de usuario · No es una app oficial de LIDOM. Uso de MLB Stats API sujeto a sus condiciones de utilización.</div></div><script>
 'use strict';
 const rows=[['Leones del Escogido',14,10,4],['Tigres del Licey',14,9,5],['Gigantes del Cibao',14,7,7],['Estrellas Orientales',13,6,7],['Toros del Este',14,5,9],['Águilas Cibaeñas',13,4,9]];
@@ -140,6 +161,16 @@ function broadcastButtons(homeTeam){
 const isLive=g=>['I','L','M'].includes(g.status?.codedGameState)||/in progress|live|en progreso/i.test(g.status?.detailedState||'');
 const isFinal=g=>g.status?.abstractGameState==='Final'||['F','O'].includes(g.status?.codedGameState);
 const isDelayed=g=>/suspend|postpon|delay|cancel|posp|aplaz/i.test(g.status?.detailedState||'');
+// El equipo visitante batea en la parte alta y el local en la baja.
+// Solo señalar un turno confirmado durante juegos en vivo.
+function battingSide(linescore,live){
+ if(!live||!linescore)return null;
+ if(typeof linescore.isTopInning==='boolean')return linescore.isTopInning?'away':'home';
+ const half=normalize(linescore.inningHalf||'').trim();
+ if(/^(top|alta|arriba)\b/.test(half))return 'away';
+ if(/^(bottom|baja|abajo)\b/.test(half))return 'home';
+ return null;
+}
 function shownStatus(g){
  if(isFinal(g))return 'FINAL';
  if(isLive(g))return '● EN VIVO';
@@ -172,17 +203,18 @@ function gameCard(g){
  const awayKey=teamName(g.teams.away.team.name),homeKey=teamName(g.teams.home.team.name);
  const away=displayTeam(g.teams.away.team.name),home=displayTeam(g.teams.home.team.name);
  const live=isLive(g),final=isFinal(g),started=live||final,delay=isDelayed(g);
+ const batting=battingSide(g.linescore,live);
  const state=live?'live':final?'final':delay?'delayed':'scheduled';
  const rawA=g.teams.away.score??g.linescore?.teams?.away?.runs;
  const rawH=g.teams.home.score??g.linescore?.teams?.home?.runs;
  const scoreA=typeof rawA==='number'&&Number.isFinite(rawA)?rawA:null;
  const scoreH=typeof rawH==='number'&&Number.isFinite(rawH)?rawH:null;
  const scoreMarkup=(score)=>started?`<span class="game-score ${score===null?'missing':''}" aria-label="${score===null?'Marcador no disponible':score+' carreras'}">${score===null?'—':score}</span>`:'';
- const teamBlock=(key,name,initial,score)=>`<div class="game-team"><span class="team-initial" data-team="${escapeHTML(key||'')}" aria-hidden="true">${escapeHTML(initial)}</span><span class="game-team-name">${escapeHTML(name)}</span>${scoreMarkup(score)}</div>`;
+ const teamBlock=(side,key,name,initial,score)=>`<div class="game-team ${batting===side?'batting':''}"><span class="team-initial" data-team="${escapeHTML(key||'')}" aria-hidden="true">${escapeHTML(initial)}</span><span class="game-team-name">${escapeHTML(name)}</span>${batting===side?'<span class="batting-tag">⚾ AL BATE</span>':''}${scoreMarkup(score)}</div>`;
  const stadium=g.venue?.name||'Estadio por confirmar';
  const city=stadiumCity(stadium);
  const aria=`${away} contra ${home}, ${shownStatus(g)}. Consultar terreno, bases y jugadas`;
- return `<article class="card game-card ${selected===g.gamePk?'selected':''}" data-pk="${g.gamePk}" data-state="${state}"><button class="game-btn" type="button" data-game="${g.gamePk}" aria-expanded="${selected===g.gamePk}" aria-label="${escapeHTML(aria)}"><div class="game-topline"><span class="game-state">${escapeHTML(shownStatus(g))}</span><span class="game-when">📅 ${escapeHTML(displayDate(g.gameDate))} · ${escapeHTML(displayTime(g.gameDate))}</span></div><div class="game-matchup">${teamBlock(awayKey,away,teamInitial(g.teams.away.team.name),scoreA)}<span class="game-vs">${started?'—':'VS'}</span>${teamBlock(homeKey,home,teamInitial(g.teams.home.team.name),scoreH)}</div><div class="game-place">📍 <span>${escapeHTML(stadium)}</span><span class="game-city">· ${escapeHTML(city)}</span></div><div class="game-action">⚾ Ver terreno, bases y jugadas <span class="chevron" aria-hidden="true">⌄</span></div></button>${broadcastButtons(homeKey)}</article>`;
+ return `<article class="card game-card ${selected===g.gamePk?'selected':''}" data-pk="${g.gamePk}" data-state="${state}"><button class="game-btn" type="button" data-game="${g.gamePk}" aria-expanded="${selected===g.gamePk}" aria-label="${escapeHTML(aria)}"><div class="game-topline"><span class="game-state">${escapeHTML(shownStatus(g))}</span><span class="game-when">📅 ${escapeHTML(displayDate(g.gameDate))} · ${escapeHTML(displayTime(g.gameDate))}</span></div><div class="game-matchup">${teamBlock('away',awayKey,away,teamInitial(g.teams.away.team.name),scoreA)}<span class="game-vs">${started?'—':'VS'}</span>${teamBlock('home',homeKey,home,teamInitial(g.teams.home.team.name),scoreH)}</div><div class="game-place">📍 <span>${escapeHTML(stadium)}</span><span class="game-city">· ${escapeHTML(city)}</span></div><div class="game-action">⚾ Ver terreno, bases y jugadas <span class="chevron" aria-hidden="true">⌄</span></div></button>${broadcastButtons(homeKey)}</article>`;
 }
 let games=[],selected=null,standingsLoaded=false,liveLoaded=false;
 const lastUpdate={juegos:null,posiciones:null,calendario:null};
@@ -219,10 +251,11 @@ function detailRender(g,feed){
  }else{
   const inning=live?(l?.currentInningOrdinal||l?.currentInning||'—'):'Final';
   const half=live?(l?.inningHalf||''):'';
+  const batting=battingSide(l,live);
   const bases=live&&l?.offense?diamond(l):`<div class="game-detail-message">${live?'La fuente todavía no ha informado qué bases están ocupadas.':'El partido terminó. Las bases en tiempo real ya no están disponibles.'}</div>`;
   const latestPlay=current?.result?.description||last?.result?.description||'La fuente todavía no ha publicado jugadas detalladas de este partido.';
   const count=(n)=>live?numberOrDash(n):'—';
-  root.innerHTML=`<section class="view-detail">${header}<div class="scoreboard"><div><strong>${escapeHTML(away)}</strong><div class="score">${numberOrDash(sa)}</div></div><div><span class="muted">${escapeHTML(String(inning))}</span><br><span class="muted">${escapeHTML(half)}</span></div><div><strong>${escapeHTML(home)}</strong><div class="score">${numberOrDash(sh)}</div></div></div>${bases}<div class="counts"><div class="stat"><strong>${count(l?.balls)}</strong><span>Bolas</span></div><div class="stat"><strong>${count(l?.strikes)}</strong><span>Strikes</span></div><div class="stat"><strong>${count(l?.outs)}</strong><span>Outs</span></div></div><div class="play"><b>${live?'Última jugada':'Última jugada registrada'}</b><p>${escapeHTML(latestPlay)}</p></div><p class="data-source">${feed?'Detalle consultado de MLB Stats API.':'Detalle no disponible: se conserva únicamente la información confirmada por el calendario.'} No se inventan carreras, corredores ni conteos.</p></section>`;
+  root.innerHTML=`<section class="view-detail">${header}<div class="scoreboard"><div class="scoreboard-team ${batting==='away'?'batting-team':''}"><strong>${escapeHTML(away)}</strong>${batting==='away'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sa)}</div></div><div><span class="muted">${escapeHTML(String(inning))}</span><br><span class="muted">${escapeHTML(half)}</span></div><div class="scoreboard-team ${batting==='home'?'batting-team':''}"><strong>${escapeHTML(home)}</strong>${batting==='home'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sh)}</div></div></div>${bases}<div class="counts"><div class="stat"><strong>${count(l?.balls)}</strong><span>Bolas</span></div><div class="stat"><strong>${count(l?.strikes)}</strong><span>Strikes</span></div><div class="stat"><strong>${count(l?.outs)}</strong><span>Outs</span></div></div><div class="play"><b>${live?'Última jugada':'Última jugada registrada'}</b><p>${escapeHTML(latestPlay)}</p></div><p class="data-source">${feed?'Detalle consultado de MLB Stats API.':'Detalle no disponible: se conserva únicamente la información confirmada por el calendario.'} No se inventan carreras, corredores ni conteos.</p></section>`;
  }
  $('#close-detail').onclick=()=>{root.hidden=true;selected=null;renderGames();};
 }
