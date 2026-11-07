@@ -161,16 +161,31 @@ const BNT_CHANNELS = Object.freeze({
  'escogido':{name:'La Cueva Roja · Abriendo Sports',url:'https://www.youtube.com/@abriendosports'},
  'águilas':{name:'Águilas Cibaeñas · YouTube oficial',url:'https://www.youtube.com/channel/UC_l6h1_eJl7yJ1aagWximmA'}
 });
+// Una sola emisora por equipo local; enlaces a escucha externa, no retransmisión.
+const BNT_RADIOS = Object.freeze({
+ 'águilas':{name:'CDN Radio 92.5 FM',url:'https://cdnradio.com.do/'},
+ 'licey':{name:'Independencia 93.3 FM',url:'https://radios.com.do/independencia/'},
+ 'escogido':{name:'Independencia 93.3 FM',url:'https://radios.com.do/independencia/'},
+ 'gigantes':{name:'Perla 106.3 FM',url:'https://perla106fm.com/'},
+ 'estrellas':{name:'La 98 FM',url:'https://la98fm.com/'},
+ 'toros':{name:'Audio oficial Toros del Este',url:'https://torosdeleste.com/radio.html'}
+});
 function broadcastButtons(homeTeam,awayTeam){
- // Solo enlaces oficiales de equipos identificados; no prometen transmisión del encuentro.
+ // Mantener los enlaces originales de TV para ambos equipos.
  const teams=[homeTeam,awayTeam].filter(Boolean).map(name=>teamName(name)||normalize(name));
  const channels=[...new Set(teams)].filter(key=>BNT_CHANNELS[key]);
- if(!channels.length)return '';
- const links=channels.map(key=>{
+ const tvLinks=channels.map(key=>{
    const channel=BNT_CHANNELS[key];
    return `<a target="_blank" rel="noopener noreferrer" href="${channel.url}" aria-label="Consultar canal oficial de ${escapeHTML(displayTeam(key))}">📺 Consultar canal oficial · ${escapeHTML(displayTeam(key))} ↗</a>`;
  }).join('');
- return `<div class="transmission-links" role="group" aria-label="Canales oficiales de los equipos">${links}<small>Canales informativos de los equipos. La transmisión de este partido no está garantizada.</small></div>`;
+ // Mostrar exactamente una emisora: la correspondiente al equipo local.
+ const homeKey=teamName(homeTeam)||normalize(homeTeam||'');
+ const radio=BNT_RADIOS[homeKey];
+ const radioLink=radio
+   ? `<a class="secondary" target="_blank" rel="noopener noreferrer" href="${radio.url}" aria-label="Escuchar radio ${escapeHTML(radio.name)} del equipo local ${escapeHTML(displayTeam(homeKey))}">📻 Escuchar radio · ${escapeHTML(radio.name)} ↗</a>`
+   :'';
+ if(!tvLinks&&!radioLink)return '';
+ return `<div class="transmission-links" role="group" aria-label="Opciones externas de televisión y radio">${tvLinks}${radioLink}<small>Enlaces externos informativos. La transmisión de este partido por televisión o radio no está garantizada.</small></div>`;
 }
 const isLive=g=>['I','L','M'].includes(g.status?.codedGameState)||/in progress|live|en progreso/i.test(g.status?.detailedState||'');
 const isFinal=g=>g.status?.abstractGameState==='Final'||['F','O'].includes(g.status?.codedGameState);
