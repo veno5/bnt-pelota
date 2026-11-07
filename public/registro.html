@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>BNT Pelota · Registro</title>
+<title>BNT Pelota · Registro</title><meta name="theme-color" content="#0b223f"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=bnt-2026-11-icono2"><link rel="manifest" href="/manifest.webmanifest?v=2026-11-07-bnt2">
 <style>
 :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#f2f8ff;background:#071b30}*{box-sizing:border-box}
 body{margin:0;background:linear-gradient(155deg,#0e3761,#061b31 60%);min-height:100vh}
@@ -22,7 +22,9 @@ button{width:100%;background:#efbd48;color:#1e2c38;font-weight:900;border:0;bord
 <body><main class="wrap">
 <a href="./">← Volver a BNT Pelota</a>
 <div class="head"><img src="./icon-192.png" alt="BNT Pelota"><div><h1>BNT Pelota Dominicana</h1><p class="subtitle">Registro y mensualidades</p></div></div>
-<section class="card"><div class="price">US$2 <span>/ mes · pago por transferencia</span></div><p class="muted">El registro no cobra dinero. El administrador confirmará el pago y activará la mensualidad. Los partidos siguen en acceso abierto mientras se completan las autorizaciones comerciales.</p></section>
+<section class="card"><div class="price">3 días gratis · US$3/mes · US$8/temporada</div>
+<p class="muted">La prueba comienza cuando te registras y dura 72 horas. Después, Juegos, terreno, radio y televisión quedan reservados para cuentas activas. Calendario y Posiciones permanecen gratuitos.</p>
+<p class="muted"><strong>Pago manual:</strong> el administrador confirma la transferencia. No se realiza ningún cargo desde esta página.</p></section>
 <div id="message" role="status" hidden></div>
 <section class="card" id="ready" hidden><h2>Crear mi cuenta</h2>
 <form id="signup">
@@ -30,16 +32,17 @@ button{width:100%;background:#efbd48;color:#1e2c38;font-weight:900;border:0;bord
 <label for="phone">Número de teléfono de RD</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="809 000 0000" required>
 <label for="pin">PIN privado (6 a 8 números)</label><input id="pin" name="pin" inputmode="numeric" type="password" pattern="[0-9]{6,8}" minlength="6" maxlength="8" autocomplete="new-password" required>
 <button type="submit">Registrarme</button>
-</form><p class="muted">Después del registro, comunícate con el administrador para conocer cómo transferir y confirmar tu pago.</p>
+</form><p class="muted">Una prueba gratuita por cuenta. Después puedes solicitar un pago mensual de US$3 o de temporada de US$8; la activación es manual.</p>
 </section>
 <section class="card" id="access" hidden><h2>Ya tengo una cuenta</h2>
 <form id="login">
 <label for="login-phone">Teléfono</label><input id="login-phone" type="tel" autocomplete="tel" required>
 <label for="login-pin">PIN privado</label><input id="login-pin" type="password" inputmode="numeric" autocomplete="current-password" required>
-<button type="submit" class="ghost">Consultar mi mensualidad</button>
+<button type="submit" class="ghost">Entrar a mis Juegos</button>
 </form>
 </section>
 <section class="card" id="account" hidden><h2>Mi cuenta</h2><p id="account-details"></p><button id="logout" type="button" class="ghost">Cerrar sesión</button></section>
+<p class="muted">Privacidad: registramos la fecha de acceso de tu cuenta para calcular la prueba y comprobar las suscripciones. En BNT Pelota contamos visitas con identificadores aleatorios del navegador.</p>
 <p class="muted"><a href="./admin.html">Acceso del administrador</a></p>
 </main>
 <script>
@@ -58,7 +61,8 @@ async function current(){
   if(data.role!=="member")return;
   $("ready").hidden=true;$("access").hidden=true;$("account").hidden=false;
   const m=data.member;
-  $("account-details").textContent=m.name+" · "+m.phone+" · "+(m.active?"Mensualidad activa hasta "+m.paid_until:m.status==="suspended"?"Cuenta suspendida":m.status==="expired"?"Mensualidad vencida":"Pendiente de confirmación del pago");
+  $("account-details").textContent=m.name+" · "+m.phone+" · "+(m.status==="trial"?"Prueba gratuita hasta "+new Date(m.trial_until).toLocaleString("es-DO"):m.active?"Plan "+(m.plan==="season"?"temporada":"mensual")+" activo hasta "+m.paid_until:m.status==="suspended"?"Cuenta suspendida":"Prueba o plan vencido · Calendario y Posiciones disponibles gratis");
+  const link=document.createElement("a");link.href="/";link.textContent=m.active?"⚾ Abrir Juegos":"📅 Abrir Calendario y Posiciones";link.style.color="#ffe092";link.style.display="block";link.style.margin="12px 0";$("account-details").append(link);
  }catch(_){}
 }
 (async()=>{try{
@@ -70,8 +74,10 @@ async function current(){
 $("signup").addEventListener("submit",async e=>{
  e.preventDefault();const btn=e.currentTarget.querySelector("button");btn.disabled=true;
  try{
-  await api("register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:$("name").value,phone:$("phone").value,pin:$("pin").value})});
-  $("signup").reset();message("Registro recibido. Ahora puedes consultar tu cuenta; la mensualidad se activa cuando el administrador confirme la transferencia.",true);
+  const phone=$("phone").value,pin=$("pin").value;
+  await api("register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:$("name").value,phone,pin})});
+  await api("login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phone,pin})});
+  $("signup").reset();message("¡Registro completo! Tus 3 días de prueba están activos. Puedes abrir Juegos.",true);await current();
  }catch(err){message(err.message)}finally{btn.disabled=false}
 });
 $("login").addEventListener("submit",async e=>{
