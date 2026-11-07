@@ -50,11 +50,12 @@ jobs:
         continue-on-error: true
         run: |
           for intento in 1 2 3 4 5; do
-            RESPUESTA="$(curl -fsS --max-time 12 https://bnt-pelota.pages.dev/api/health 2>&1)" && {
-              echo "DIAGNOSTICO: $RESPUESTA"
-              exit 0
-            }
+            RESPUESTA="$(curl -sS --max-time 12 https://bnt-pelota.pages.dev/api/health 2>&1)" || true
             echo "Intento $intento: $RESPUESTA"
+            if printf '%s' "$RESPUESTA" | grep -q '"ok":true'; then
+              echo "API DE REGISTRO: CORRECTA"
+              exit 0
+            fi
             sleep 4
           done
           echo "No se pudo verificar la API del registro"
