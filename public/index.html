@@ -146,6 +146,7 @@
 .plans-footer a,.access-gate a,.install-cta{display:inline-flex;align-items:center;justify-content:center;background:#efba47;border:0;border-radius:10px;padding:9px 12px;font-weight:900;color:#1c2b39;text-decoration:none;cursor:pointer;font-size:12px}
 #install-help[hidden],#access-gate[hidden]{display:none}
 #install-help{font-size:12px;color:#cfe3ef;line-height:1.5;margin:10px 0 0}
+#juegos .demo-section[hidden]{display:none!important}
 .access-gate{border:1px solid #d6a951;background:linear-gradient(110deg,#1e4364,#152e49);border-radius:14px;text-align:center;padding:20px 15px;margin:12px 0}
 .access-gate h3{color:#ffe0a0;margin:5px 0 7px}.access-gate p{line-height:1.5;font-size:13px;color:#e3f1f7}
 #account-banner{font-size:12px;color:#c1e7cd;margin-top:8px;text-align:center}
@@ -483,8 +484,12 @@ function visitorId(){
   return id
  }catch(_){return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(x=>x.toString(16).padStart(2,'0')).join('')}
 }
+let lastVisitSent=0,lastVisitRole="";
 async function trackVisit(){
- try{await fetch('/api/visit',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({visitor:visitorId()}),keepalive:true})}catch(_){}
+ const now=Date.now();
+ if(now-lastVisitSent<15*60*1000&&lastVisitRole===accessRole)return;
+ lastVisitSent=now;lastVisitRole=accessRole;
+ try{await fetch('/api/visit',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({visitor:visitorId()}),keepalive:true})}catch(_){lastVisitSent=0}
 }
 let beforeInstallEvent=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();beforeInstallEvent=e});

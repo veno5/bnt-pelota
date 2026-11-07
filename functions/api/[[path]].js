@@ -1,7 +1,8 @@
 // BNT Pelota Dominicana - licencias con confirmacion manual (Cloudflare Pages + D1).
 // No habilitar cobro ni restringir los juegos antes de verificar autorizaciones comerciales.
 const jsonHeaders={"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"};
-const today=()=>new Date().toISOString().slice(0,10);
+// Fecha de República Dominicana (UTC-4), sin horario de verano.
+const today=()=>new Date(Date.now()-4*3600*1000).toISOString().slice(0,10);
 let initPromise=null;
 const json=(value,status=200,headers={})=>new Response(JSON.stringify(value),{status,headers:{...jsonHeaders,...headers}});
 const reject=(message,status=400)=>json({ok:false,error:message},status);
