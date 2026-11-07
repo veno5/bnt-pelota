@@ -127,6 +127,15 @@
 #juegos .scoreboard .scoreboard-team{min-width:0}
 #juegos .scoreboard .scoreboard-team strong{overflow-wrap:anywhere}
 @media(max-width:420px){#juegos .batting-tag{font-size:10px;padding:5px 4px}#juegos .scoreboard .scoreboard-team strong{font-size:13px}}
+/* Lanzador y última sustitución, basados en datos confirmados del partido. */
+#juegos .pitcher-panel{border:1px solid #4b89b5;border-left:5px solid #64baf2;background:linear-gradient(110deg,#113955,#0d2843);border-radius:12px;padding:13px 15px;margin:12px 0 16px;color:#edf8ff}
+#juegos .pitcher-panel>strong{display:block;font-size:12px;color:#bce0ff;letter-spacing:.25px}
+#juegos .pitcher-current{font-size:20px;font-weight:900;line-height:1.35;margin-top:5px;overflow-wrap:anywhere}
+#juegos .pitcher-pending{display:block;color:#bdcedd;font-size:12px;margin-top:5px}
+#juegos .pitcher-change{border-top:1px solid #43637b;margin-top:11px;padding-top:10px;display:flex;flex-direction:column;gap:5px;font-size:12px}
+#juegos .pitcher-change strong{font-size:12px;color:#ffe096}
+#juegos .pitcher-change span:last-child{color:#b4f5d1;font-weight:750}
+@media(max-width:450px){#juegos .pitcher-current{font-size:18px}}
 </style></head><body><div class="wrap"><div class="top"><div><div class="logo"><img class="app-brand-icon" src="./icon-192.png?v=bnt-icono-original" alt="Ícono BNT Pelota" width="48" height="48">BNT Pelota Dominicana</div><div class="sub">BNT Technology · LIDOM 2026–2027</div></div><span class="tag">DATOS DE LIDOM</span></div><div class="hero"><strong>⚾ ¡La pelota dominicana en tu celular!</strong><p>Resultados, posiciones y calendario. <b>¡Todo en un solo lugar!</b></p></div><nav class="tabs" aria-label="Secciones"><button class="on" data-tab="juegos">⚾ Juegos</button><button data-tab="posiciones">🏆 Posiciones</button><button data-tab="calendario">📅 Calendario</button></nav><section class="panel on" id="juegos"><h2>Partidos y terreno de juego</h2><div class="update-row"><p id="live-status" class="live-status" role="status">Preparando consulta a MLB Stats API…</p><button class="outline-button" id="force-refresh" type="button">↻ Actualizar</button></div><section class="demo-section" aria-label="Partidos y terreno"><div id="next-games" hidden></div><div id="game-detail" hidden></div><div id="demo-games" hidden></div></section></section><section class="panel" id="posiciones" hidden><h2>Tabla de posiciones</h2><p id="standings-note" class="muted">Consultando posiciones de LIDOM…</p><div class="card"><table><thead><tr><th>Equipo</th><th>J</th><th>G</th><th>P</th><th>PCT</th></tr></thead><tbody id="standings"></tbody></table></div><p class="tiny">J = jugados · G = ganados · P = perdidos. Tabla recibida de MLB Stats API. Si falla la conexión, se conserva la última consulta y se indica su hora.</p></section><section class="panel" id="calendario" hidden><h2>Próximos partidos</h2><p id="calendar-note" class="muted">Consultando próximos juegos…</p><div id="calendar"></div><p class="tiny">Horarios de República Dominicana. El calendario puede cambiar por aplazamientos, suspensiones o decisiones de LIDOM.</p></section><div class="links"><a href="https://www.mlb.com/es/live-stream-games/lidom/2026-schedule" target="_blank" rel="noopener">Calendario MLB ↗</a><a href="https://pelotainvernal.medios.com.do/posiciones/" target="_blank" rel="noopener">Fuente de posiciones ↗</a><a href="https://lidom.com/estadisticas" target="_blank" rel="noopener">LIDOM ↗</a></div><div class="footer">Proyecto independiente · Solo consulta · Sin cuentas de usuario · No es una app oficial de LIDOM. Uso de MLB Stats API sujeto a sus condiciones de utilización.</div></div><script>
 'use strict';
 const rows=[['Leones del Escogido',14,10,4],['Tigres del Licey',14,9,5],['Gigantes del Cibao',14,7,7],['Estrellas Orientales',13,6,7],['Toros del Este',14,5,9],['Águilas Cibaeñas',13,4,9]];
@@ -239,6 +248,37 @@ function renderGames(){
 }
 function diamond(l,preview=false){const o=l?.offense||{};const p=[!!o.second,!!o.first,!!o.third];const points=[[160,40],[215,96],[105,96],[160,146]];const rect=points.map(([x,y],i)=>`<rect x="${x-8}" y="${y-8}" width="16" height="16" rx="2" transform="rotate(45 ${x} ${y})" fill="${i<3&&p[i]?'#efbd42':'#d6e8dc'}" stroke="#3d7a51" stroke-width="2"/>`).join('');return `<div class="field"><svg viewBox="0 0 320 172" role="img" aria-label="Diamante de béisbol, las bases amarillas indican corredores"><path d="M160 12 L274 110 L160 164 L46 110 Z" fill="#317a56" stroke="#659f70" stroke-width="2"/><path d="M160 40 L215 96 L160 146 L105 96 Z" fill="#c39960" stroke="#f1d1a0" stroke-width="1"/>${rect}<text x="160" y="22" text-anchor="middle" fill="white" font-size="11">2ª</text><text x="250" y="97" fill="white" font-size="11">1ª</text><text x="70" y="97" fill="white" font-size="11">3ª</text></svg><div class="field-caption">${preview?'Bases vacías · el partido todavía no comienza':l?.offense?'Amarillo: base ocupada':'La fuente no ha informado corredores en base'}</div></div>`}
 function numberOrDash(n){return typeof n==='number'?n:'—'}
+// Datos del pitcher actual y última sustitución verificada por la secuencia del boxscore.
+function pitcherPanel(g,feed,linescore){
+ if(!isLive(g))return '';
+ const batting=battingSide(linescore,true);
+ const defenseSide=batting==='away'?'home':batting==='home'?'away':null;
+ if(!defenseSide){
+  return '<section class="pitcher-panel"><strong>🎯 Lanzador actual</strong><span class="pitcher-pending">Información del lanzador por confirmar</span></section>';
+ }
+ const team=displayTeam(g.teams[defenseSide].team.name);
+ const box=feed?.liveData?.boxscore?.teams?.[defenseSide];
+ const people=feed?.gameData?.players||{};
+ const activeFromLinescore=linescore?.defense?.pitcher;
+ const currentPlay=feed?.liveData?.plays?.currentPlay;
+ const expectedHalf=batting==='away'?'top':'bottom';
+ const playPitcher=currentPlay?.about?.halfInning===expectedHalf?currentPlay?.matchup?.pitcher:null;
+ const active=activeFromLinescore||playPitcher;
+ const pitcherId=Number(active?.id);
+ const nameFor=id=>{
+  if(!Number.isInteger(id)||id<=0)return '';
+  return people['ID'+id]?.fullName||box?.players?.['ID'+id]?.person?.fullName||'';
+ };
+ const name=(active?.fullName||nameFor(pitcherId)||'').trim();
+ const list=Array.isArray(box?.pitchers)?box.pitchers.map(Number).filter(Number.isInteger):[];
+ const position=Number.isInteger(pitcherId)?list.indexOf(pitcherId):-1;
+ const previousId=position>0&&position===list.length-1?list[position-1]:null;
+ const oldName=previousId?nameFor(previousId).trim():'';
+ const change=oldName&&name&&oldName!==name
+  ?'<div class="pitcher-change"><strong>🔄 Último cambio de lanzador</strong><span>Sale: '+escapeHTML(oldName)+'</span><span>Entra: '+escapeHTML(name)+'</span></div>'
+  :'';
+ return '<section class="pitcher-panel"><strong>🎯 Lanzando por '+escapeHTML(team)+'</strong><div class="pitcher-current">'+escapeHTML(name||'Lanzador por confirmar')+'</div>'+change+'</section>';
+}
 function detailRender(g,feed){
  const home=displayTeam(g.teams.home.team.name),away=displayTeam(g.teams.away.team.name);
  const started=isLive(g)||isFinal(g),live=isLive(g);
@@ -260,7 +300,7 @@ function detailRender(g,feed){
   const bases=live&&l?.offense?diamond(l):`<div class="game-detail-message">${live?'La fuente todavía no ha informado qué bases están ocupadas.':'El partido terminó. Las bases en tiempo real ya no están disponibles.'}</div>`;
   const latestPlay=current?.result?.description||last?.result?.description||'La fuente todavía no ha publicado jugadas detalladas de este partido.';
   const count=(n)=>live?numberOrDash(n):'—';
-  root.innerHTML=`<section class="view-detail">${header}<div class="scoreboard"><div class="scoreboard-team ${batting==='away'?'batting-team':''}"><strong>${escapeHTML(away)}</strong>${batting==='away'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sa)}</div></div><div><span class="muted">${escapeHTML(String(inning))}</span><br><span class="muted">${escapeHTML(half)}</span></div><div class="scoreboard-team ${batting==='home'?'batting-team':''}"><strong>${escapeHTML(home)}</strong>${batting==='home'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sh)}</div></div></div>${bases}<div class="counts"><div class="stat"><strong>${count(l?.balls)}</strong><span>Bolas</span></div><div class="stat"><strong>${count(l?.strikes)}</strong><span>Strikes</span></div><div class="stat"><strong>${count(l?.outs)}</strong><span>Outs</span></div></div><div class="play"><b>${live?'Última jugada':'Última jugada registrada'}</b><p>${escapeHTML(latestPlay)}</p></div><p class="data-source">${feed?'Detalle consultado de MLB Stats API.':'Detalle no disponible: se conserva únicamente la información confirmada por el calendario.'} No se inventan carreras, corredores ni conteos.</p></section>`;
+  root.innerHTML=`<section class="view-detail">${header}<div class="scoreboard"><div class="scoreboard-team ${batting==='away'?'batting-team':''}"><strong>${escapeHTML(away)}</strong>${batting==='away'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sa)}</div></div><div><span class="muted">${escapeHTML(String(inning))}</span><br><span class="muted">${escapeHTML(half)}</span></div><div class="scoreboard-team ${batting==='home'?'batting-team':''}"><strong>${escapeHTML(home)}</strong>${batting==='home'?'<span class="batting-tag">⚾ AL BATE</span>':''}<div class="score">${numberOrDash(sh)}</div></div></div>${pitcherPanel(g,feed,l)}${bases}<div class="counts"><div class="stat"><strong>${count(l?.balls)}</strong><span>Bolas</span></div><div class="stat"><strong>${count(l?.strikes)}</strong><span>Strikes</span></div><div class="stat"><strong>${count(l?.outs)}</strong><span>Outs</span></div></div><div class="play"><b>${live?'Última jugada':'Última jugada registrada'}</b><p>${escapeHTML(latestPlay)}</p></div><p class="data-source">${feed?'Detalle consultado de MLB Stats API.':'Detalle no disponible: se conserva únicamente la información confirmada por el calendario.'} No se inventan carreras, corredores ni conteos.</p></section>`;
  }
  $('#close-detail').onclick=()=>{root.hidden=true;selected=null;renderGames();};
 }
