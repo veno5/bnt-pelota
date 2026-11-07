@@ -17,6 +17,11 @@ button{width:100%;background:#efbd48;color:#1e2c38;font-weight:900;border:0;bord
 .ghost{background:#1c496b;color:#e3f5ff;margin-top:9px}.muted{font-size:12px;line-height:1.5;color:#b6d0df}
 #message{margin:14px 0;border-radius:10px;padding:12px;background:#173d5a;line-height:1.5}#message[hidden],.card[hidden]{display:none}
 .ok{border-left:4px solid #60e6a2}.bad{border-left:4px solid #ff9c9c}.hint{color:#eedda5}
+
+.plan-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.plan-choices button{margin:0;border:1px solid #6787a4;background:#123c5d;color:#e9f6ff;min-height:67px;padding:10px 7px}
+.plan-choices button[aria-pressed="true"]{background:#efbd48;border-color:#ffe199;color:#1e2c38}
+#chosen-plan-text{font-size:13px;line-height:1.55;color:#ffe7ac;margin:11px 0}
 </style>
 </head>
 <body><main class="wrap">
@@ -25,6 +30,17 @@ button{width:100%;background:#efbd48;color:#1e2c38;font-weight:900;border:0;bord
 <section class="card"><div class="price">3 días gratis · US$3/mes · US$8/temporada</div>
 <p class="muted">La prueba comienza cuando te registras y dura 72 horas. Después, Juegos, terreno, radio y televisión quedan reservados para cuentas activas. Calendario y Posiciones permanecen gratuitos.</p>
 <p class="muted"><strong>Pago manual:</strong> el administrador confirma la transferencia. No se realiza ningún cargo desde esta página.</p></section>
+
+<section class="card" aria-labelledby="choose-title">
+ <h2 id="choose-title">Elige tu plan cuando lo necesites</h2>
+ <p class="muted">Puedes disfrutar primero tus 3 días gratis. No es obligatorio elegir un plan ahora.</p>
+ <div class="plan-choices">
+  <button type="button" data-choose-plan="monthly" aria-pressed="false">US$3 · Pago mensual</button>
+  <button type="button" data-choose-plan="season" aria-pressed="false">US$8 · Pago único por temporada</button>
+ </div>
+ <p id="chosen-plan-text" aria-live="polite">Todavía no has seleccionado un plan.</p>
+ <p class="muted">El pago es por transferencia y lo confirma el administrador. Seleccionar un plan aquí no cobra ni activa automáticamente la cuenta.</p>
+</section>
 <div id="message" role="status" hidden></div>
 <section class="card" id="ready" hidden><h2>Crear mi cuenta</h2>
 <form id="signup">
@@ -65,6 +81,21 @@ async function current(){
   const link=document.createElement("a");link.href="/";link.textContent=m.active?"⚾ Abrir Juegos":"📅 Abrir Calendario y Posiciones";link.style.color="#ffe092";link.style.display="block";link.style.margin="12px 0";$("account-details").append(link);
  }catch(_){}
 }
+let chosenPlan=new URLSearchParams(location.search).get("plan");
+function selectPlan(value){
+ chosenPlan=["monthly","season"].includes(value)?value:null;
+ document.querySelectorAll("[data-choose-plan]").forEach(btn=>btn.setAttribute("aria-pressed",String(btn.dataset.choosePlan===chosenPlan)));
+ $("chosen-plan-text").textContent=chosenPlan==="monthly"
+  ?"Elegiste el plan mensual de US$3. La activación se realiza tras confirmar tu transferencia."
+  :chosenPlan==="season"
+  ?"Elegiste el pago único de US$8 por la temporada 2026–2027. La activación se realiza tras confirmar tu transferencia."
+  :"Puedes registrarte y disfrutar primero tus 3 días gratis.";
+ const next=new URL(location.href);
+ if(chosenPlan)next.searchParams.set("plan",chosenPlan);else next.searchParams.delete("plan");
+ history.replaceState(null,"",next.pathname+next.search+next.hash);
+}
+document.querySelectorAll("[data-choose-plan]").forEach(btn=>btn.addEventListener("click",()=>selectPlan(btn.dataset.choosePlan)));
+selectPlan(chosenPlan);
 (async()=>{try{
  const x=await api("status");
  if(!x.configured){message("El registro está en preparación. Todavía no se pueden activar cuentas.");return}
