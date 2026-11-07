@@ -136,6 +136,20 @@
 #juegos .pitcher-change strong{font-size:12px;color:#ffe096}
 #juegos .pitcher-change span:last-child{color:#b4f5d1;font-weight:750}
 @media(max-width:450px){#juegos .pitcher-current{font-size:18px}}
+
+/* Aviso en la aplicación 24 horas antes del vencimiento. */
+.expiry-overlay[hidden]{display:none!important}
+.expiry-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(3,13,26,.86)}
+.expiry-panel{width:min(100%,420px);max-height:calc(100dvh - 32px);overflow-y:auto;padding:24px 20px 20px;border:2px solid #e9b64d;border-radius:19px;background:linear-gradient(145deg,#143d61,#081f38);box-shadow:0 20px 80px #0009;text-align:center;color:#eff8ff}
+.expiry-panel .expiry-bell{font-size:37px;line-height:1.2}
+.expiry-panel h2{color:#ffe0a0;margin:10px 0;font-size:22px;line-height:1.25}
+.expiry-panel p{font-size:14px;line-height:1.55;color:#e2edf7;margin:10px 0}
+.expiry-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:18px 0 12px}
+.expiry-options a{display:flex;flex-direction:column;gap:5px;justify-content:center;padding:15px 8px;border-radius:12px;border:1px solid #f0cd77;background:#e8b84c;color:#1e2a37;text-decoration:none;font-size:12px;font-weight:750}
+.expiry-options a strong{font-size:25px;line-height:1.2}
+.expiry-panel .expiry-note{font-size:11px;color:#c6d8e6}
+.expiry-later{margin:7px auto 0;padding:10px 18px;border:1px solid #779ab6;border-radius:10px;background:#204866;color:#f3faff;font-weight:750;cursor:pointer}
+@media(max-width:340px){.expiry-panel{padding:18px 12px}.expiry-panel h2{font-size:19px}.expiry-options a strong{font-size:21px}}
 /* Suscripciones: mostrar planes sin modificar estilos de partidos, Calendario o Posiciones */
 .plans-wrap{margin:13px 0 16px;padding:14px;border:1px solid #5682a5;border-radius:15px;background:linear-gradient(125deg,#153f64,#0c2846)}
 .plans-wrap h2{font-size:17px;margin:0 0 11px;color:#ffe5a4;text-align:center}
@@ -163,7 +177,20 @@
 <div id="account-banner" aria-live="polite">Consultando acceso…</div>
 <div id="install-help" hidden>En iPhone: abre este enlace en Safari, pulsa Compartir y luego «Agregar a inicio». En Android: abre Chrome, menú ⋮ y «Instalar aplicación» o «Agregar a pantalla de inicio». Si ya tenías un acceso sin ícono, elimínalo y vuelve a instalarlo.</div>
 </section><nav class="tabs" aria-label="Secciones"><button class="on" data-tab="juegos">⚾ Juegos</button><button data-tab="posiciones">🏆 Posiciones</button><button data-tab="calendario">📅 Calendario</button></nav><section class="panel on" id="juegos"><h2>Partidos y terreno de juego</h2>
-<div id="access-gate" class="access-gate" hidden><h3>🔒 Juegos disponibles con prueba o suscripción</h3><p id="gate-message">Regístrate para disfrutar 3 días gratis. Al terminar la prueba, Calendario y Posiciones siguen gratis.</p><p><a href="/registro.html">Entrar o activar prueba</a></p><button type="button" id="access-retry">Ya inicié sesión · comprobar acceso</button></div><div class="update-row"><p id="live-status" class="live-status" role="status">Preparando consulta a MLB Stats API…</p><button class="outline-button" id="force-refresh" type="button">↻ Actualizar</button></div><section class="demo-section" aria-label="Partidos y terreno"><div id="next-games" hidden></div><div id="game-detail" hidden></div><div id="demo-games" hidden></div></section></section><section class="panel" id="posiciones" hidden><h2>Tabla de posiciones</h2><p id="standings-note" class="muted">Consultando posiciones de LIDOM…</p><div class="card"><table><thead><tr><th>Equipo</th><th>J</th><th>G</th><th>P</th><th>PCT</th></tr></thead><tbody id="standings"></tbody></table></div><p class="tiny">J = jugados · G = ganados · P = perdidos. Tabla recibida de MLB Stats API. Si falla la conexión, se conserva la última consulta y se indica su hora.</p></section><section class="panel" id="calendario" hidden><h2>Próximos partidos</h2><p id="calendar-note" class="muted">Consultando próximos juegos…</p><div id="calendar"></div><p class="tiny">Horarios de República Dominicana. El calendario puede cambiar por aplazamientos, suspensiones o decisiones de LIDOM.</p></section><div class="links"><a href="https://www.mlb.com/es/live-stream-games/lidom/2026-schedule" target="_blank" rel="noopener">Calendario MLB ↗</a><a href="https://pelotainvernal.medios.com.do/posiciones/" target="_blank" rel="noopener">Fuente de posiciones ↗</a><a href="https://lidom.com/estadisticas" target="_blank" rel="noopener">LIDOM ↗</a></div><div class="footer">Proyecto independiente · Solo consulta · Sin cuentas de usuario · No es una app oficial de LIDOM. Uso de MLB Stats API sujeto a sus condiciones de utilización.</div></div><script>
+<div id="access-gate" class="access-gate" hidden><h3>🔒 Juegos disponibles con prueba o suscripción</h3><p id="gate-message">Regístrate para disfrutar 3 días gratis. Al terminar la prueba, Calendario y Posiciones siguen gratis.</p><p><a href="/registro.html">Entrar o activar prueba</a></p><button type="button" id="access-retry">Ya inicié sesión · comprobar acceso</button></div><div class="update-row"><p id="live-status" class="live-status" role="status">Preparando consulta a MLB Stats API…</p><button class="outline-button" id="force-refresh" type="button">↻ Actualizar</button></div><section class="demo-section" aria-label="Partidos y terreno"><div id="next-games" hidden></div><div id="game-detail" hidden></div><div id="demo-games" hidden></div></section></section><section class="panel" id="posiciones" hidden><h2>Tabla de posiciones</h2><p id="standings-note" class="muted">Consultando posiciones de LIDOM…</p><div class="card"><table><thead><tr><th>Equipo</th><th>J</th><th>G</th><th>P</th><th>PCT</th></tr></thead><tbody id="standings"></tbody></table></div><p class="tiny">J = jugados · G = ganados · P = perdidos. Tabla recibida de MLB Stats API. Si falla la conexión, se conserva la última consulta y se indica su hora.</p></section><section class="panel" id="calendario" hidden><h2>Próximos partidos</h2><p id="calendar-note" class="muted">Consultando próximos juegos…</p><div id="calendar"></div><p class="tiny">Horarios de República Dominicana. El calendario puede cambiar por aplazamientos, suspensiones o decisiones de LIDOM.</p></section><div class="links"><a href="https://www.mlb.com/es/live-stream-games/lidom/2026-schedule" target="_blank" rel="noopener">Calendario MLB ↗</a><a href="https://pelotainvernal.medios.com.do/posiciones/" target="_blank" rel="noopener">Fuente de posiciones ↗</a><a href="https://lidom.com/estadisticas" target="_blank" rel="noopener">LIDOM ↗</a></div><div class="footer">Proyecto independiente · Solo consulta · Sin cuentas de usuario · No es una app oficial de LIDOM. Uso de MLB Stats API sujeto a sus condiciones de utilización.</div></div><div id="expiry-notice" class="expiry-overlay" hidden>
+ <section class="expiry-panel" role="dialog" aria-modal="true" aria-labelledby="expiry-title" aria-describedby="expiry-description">
+  <div class="expiry-bell" aria-hidden="true">🔔</div>
+  <h2 id="expiry-title">¡Tu acceso está por vencer!</h2>
+  <p id="expiry-description">Te quedan menos de 24 horas de acceso a BNT Pelota Dominicana. Elige un plan para continuar disfrutando de Juegos.</p>
+  <div class="expiry-options">
+   <a href="/registro.html?plan=monthly"><strong>US$3</strong><span>Elegir plan mensual</span></a>
+   <a href="/registro.html?plan=season"><strong>US$8</strong><span>Elegir pago único por temporada</span></a>
+  </div>
+  <p class="expiry-note">Los pagos se confirman manualmente. Seleccionar un plan no realiza un cargo automático.</p>
+  <button id="expiry-close" class="expiry-later" type="button">Ahora no · Seguir en la app</button>
+ </section>
+</div>
+<script>
 'use strict';
 const rows=[['Leones del Escogido',14,10,4],['Tigres del Licey',14,9,5],['Gigantes del Cibao',14,7,7],['Estrellas Orientales',13,6,7],['Toros del Este',14,5,9],['Águilas Cibaeñas',13,4,9]];
 const referenceGames=[['Vie 6 nov.','Escogido','Gigantes','7:00 p. m.','Estadio Julián Javier'],['Vie 6 nov.','Toros','Licey','7:30 p. m.','Estadio Quisqueya Juan Marichal'],['Vie 6 nov.','Águilas','Estrellas','7:30 p. m.','Estadio Tetelo Vargas'],['Sáb 7 nov.','Gigantes','Licey','5:00 p. m.','Estadio Quisqueya Juan Marichal'],['Sáb 7 nov.','Toros','Águilas','6:00 p. m.','Estadio Cibao'],['Sáb 7 nov.','Escogido','Estrellas','7:30 p. m.','Estadio Tetelo Vargas'],['Dom 8 nov.','Licey','Escogido','5:00 p. m.','Estadio Quisqueya Juan Marichal'],['Dom 8 nov.','Águilas','Gigantes','5:00 p. m.','Estadio Julián Javier'],['Dom 8 nov.','Estrellas','Toros','5:00 p. m.','Estadio Francisco Micheli']];
@@ -454,6 +481,37 @@ document.querySelectorAll('[data-tab]').forEach(btn=>{
  btn.type='button';
  btn.addEventListener('click',()=>activateTab(btn.dataset.tab));
 });
+let noticeShownThisVisit=false;
+let focusBeforeExpiry=null;
+function notifyExpiry(data){
+ if(noticeShownThisVisit||data.role!=="member"||!data.allowed||!data.member?.active)return;
+ const m=data.member;
+ let endMs=NaN;
+ if(m.status==="trial"&&m.trial_until){
+  endMs=Date.parse(m.trial_until);
+ }else if(m.status==="active"&&/^\d{4}-\d{2}-\d{2}$/.test(m.paid_until||"")){
+  // paid_until incluye el último día completo en RD (UTC-4).
+  endMs=Date.parse(m.paid_until+"T00:00:00-04:00")+86400000;
+ }
+ const remaining=endMs-Date.now();
+ if(!Number.isFinite(remaining)||remaining<=0||remaining>86400000)return;
+ const desc=document.getElementById("expiry-description");
+ const label=m.status==="trial"?"Tu prueba gratuita de 3 días":m.plan==="season"?"Tu plan de temporada":"Tu plan mensual";
+ desc.textContent=label+" vence en menos de 24 horas. Elige cómo continuar con Juegos de BNT Pelota Dominicana.";
+ noticeShownThisVisit=true;
+ focusBeforeExpiry=document.activeElement;
+ const notice=document.getElementById("expiry-notice");
+ notice.hidden=false;
+ document.getElementById("expiry-close").focus();
+}
+function closeExpiryNotice(){
+ document.getElementById("expiry-notice").hidden=true;
+ if(focusBeforeExpiry&&typeof focusBeforeExpiry.focus==="function")focusBeforeExpiry.focus();
+}
+document.getElementById("expiry-close").addEventListener("click",closeExpiryNotice);
+document.addEventListener("keydown",e=>{
+ if(e.key==="Escape"&&!document.getElementById("expiry-notice").hidden)closeExpiryNotice();
+});
 let accessAllowed=false,accessRole="anonymous";
 function applyAccess(data){
  accessRole=data.role||"anonymous";
@@ -473,7 +531,9 @@ async function refreshAccess(){
  try{
   const response=await fetch('/api/access',{credentials:'same-origin',cache:'no-store'});
   if(!response.ok)throw Error("Sin conexión");
-  applyAccess(await response.json());
+  const accessData=await response.json();
+  applyAccess(accessData);
+  notifyExpiry(accessData);
   if(accessAllowed){await updateLive();trackVisit()}
  }catch(e){applyAccess({allowed:false,role:"anonymous"});$('#account-banner').textContent="Acceso no verificado; Calendario y Posiciones están disponibles";}
 }
