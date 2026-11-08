@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /registro.html
+Disallow: /api/
+Sitemap: https://bnt-pelota.pages.dev/sitemap.xml
